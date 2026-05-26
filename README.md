@@ -68,21 +68,24 @@ Open the generated URL in your browser and choose your server. The bot does
 `/endgame`) are gated on the *user* having **Manage Server** permission, not
 the bot.
 
-### 4. Initialize the rules repo
+### 4. Set up the rules repo (don't use the submodule for deployment)
 
-The engine git-commits each accepted rule change to `nomic-rules`, so it
-needs its own git history. If you cloned this repo with
-`--recurse-submodules`, you're done. Otherwise:
+The engine git-commits to `nomic-rules` on every accepted proposal, and the
+`rules-git` sidecar serves it via `git daemon` on port 9418. Both of these
+require `nomic-rules/.git` to be a real directory, but in a submodule it's
+a *file* pointing to `../.git/modules/nomic-rules` — a path that doesn't
+exist inside the containers.
+
+**Clone the rules repo as a standalone checkout** outside the umbrella,
+then point the engine at it via `.env`:
 
 ```sh
-git submodule update --init
+git clone https://github.com/chrisj1/Discord-Nomic-rules.git ~/nomic-rules-live
+echo "RULES_REPO_PATH=$HOME/nomic-rules-live" >> ~/Discord-Nomic/nomic-engine/.env
 ```
 
-If `nomic-rules/.git` is missing for any reason:
-
-```sh
-cd nomic-rules && git init && git add rules.py && git commit -m "Initial rules"
-```
+(The submodule directory inside the umbrella is fine for local development
+of the rules — it's only a problem when bind-mounted into a container.)
 
 ### 5. Bring up the bot
 
