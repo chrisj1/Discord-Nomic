@@ -71,7 +71,7 @@ the bot.
 ### 4. Set up the rules repo (don't use the submodule for deployment)
 
 The engine git-commits to `nomic-rules` on every accepted proposal, and the
-`rules-git` sidecar serves it via `git daemon` on port 9418. Both of these
+`rules-http` sidecar serves it via smart HTTP on port 8418. Both of these
 require `nomic-rules/.git` to be a real directory, but in a submodule it's
 a *file* pointing to `../.git/modules/nomic-rules` — a path that doesn't
 exist inside the containers.
@@ -104,14 +104,14 @@ first game.
 `/app/rules` so the engine can read and patch `rules.py` directly. Game
 state (players, proposals, scores) lives in the named volume `nomic-data`.
 
-A second container (`rules-git`) runs `git daemon` on **port 9418** and
-exposes the same `nomic-rules` directory read-only. Players use this to
-`git clone git://<your-nas-host>:9418/nomic-rules` and pull the latest
-rules to diff against. The port needs to be reachable from wherever your
-players are — LAN, VPN, or a router port-forward. If you don't want to
-expose this, set `RULES_PUBLISH_PORT` differently or remove the `ports:`
-mapping in `docker-compose.yml` and players will need to fall back to
-the `/rules` Discord download.
+A second container (`rules-http`) runs nginx + `git-http-backend` on
+**port 8418** and exposes the same `nomic-rules` directory read-only over
+smart HTTP. Players `git clone` it to pull the latest rules to diff
+against. Because it's plain HTTP, it sits cleanly behind any HTTP reverse
+proxy — this deployment uses Cloudflare Tunnel to expose it as
+`https://nomic.chrisjerrett.com/nomic-rules`. If you don't want external
+access, leave the `ports:` mapping LAN-only and players will need to fall
+back to the `/rules` Discord download.
 
 ### Updating
 
@@ -223,12 +223,12 @@ other path in the patch is rejected.
 
 ### With git from the running bot (recommended — always current)
 
-The engine ships a read-only git server on port 9418 that serves the live
+The engine ships a read-only smart-HTTP git server that serves the live
 `rules.py` repo. Clone it once, then `git pull` to refresh before each new
 proposal:
 
 ```sh
-git clone git://<your-nas-host>:9418/nomic-rules
+git clone https://nomic.chrisjerrett.com/nomic-rules
 cd nomic-rules
 git pull                     # before each new patch
 $EDITOR rules.py             # make your change
