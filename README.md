@@ -148,40 +148,72 @@ Players can also run `/directions` inside Discord for a quick rules summary.
 tagged with `# #immutable` (locked) or `# #mutable` (freely patchable):
 
 ```python
-QUORUM_FLOOR = 2  # #immutable
+TRANSMUTATION_THRESHOLD = 1.0  # #immutable
 
 # #mutable
 def compute_quorum(players: list) -> int:
     return max(2, (len(players) + 1) // 2)
 ```
 
-The engine validates every patch through three checks before accepting it:
+The engine validates every patch through four checks before accepting it:
 
 1. **AST safety** — no file I/O, no networking, no subprocesses, no
    introspection tricks (`__class__`, `getattr`, `__subclasses__`, etc).
+   `hashlib` and `random` *are* allowed since they're pure computation.
 2. **Immutability** — `#immutable` items can't be silently modified or have
    their tag removed.
 3. **Transmutation detection** — a patch *can* downgrade an `#immutable` tag
    to `#mutable`, but the proposal is then flagged as a transmutation and
    requires unanimous YES from every non-proposer player to pass.
+4. **`is_valid_patch`** — a mutable callback in `rules.py`. Players can vote
+   in any gameplay-level rule (size limit, MD5 proof-of-work, description
+   format, per-player cooldown, etc.) and the engine enforces it on every
+   future proposal.
 
 Combined, this means: to change the body of an immutable rule, you must
 first transmute it (hard — unanimous), then submit a second amendment (easy —
 majority). The same applies to the transmutation threshold itself, so the bar
 protects itself.
 
+## Other mutable callbacks the engine consults
+
+These all live in `rules.py` and can be changed via proposals:
+
+- **`compute_quorum(players)`** / **`compute_passing_threshold(players)`** — voting math.
+- **`next_player(current_id, players)`** — turn order (round-robin by default; can be random, score-weighted, etc.).
+- **`can_propose(proposer_id, turn_id, players)`** — gates `/propose`.
+- **`can_vote(voter_id, proposer_id, players) -> int`** — returns the *weight* of
+  the voter's vote. `True`/`False` (legacy bool) and `1`/`0` mean one vote /
+  excluded. Bigger ints = weighted votes. A patch could make this
+  `random.randint(1, 5)` for chaotic weighted voting, or scale by player
+  points for plutocracy.
+- **`check_winner(players)`** — return a discord_id to end the game.
+- **`award_points(passed, proposer_id, players)`** — returns `{id: delta}` for
+  whatever scoring scheme you want.
+
 ## Engine-enforced floors
 
 The engine enforces minimum voting requirements *outside* `rules.py`, in
 code players can never modify:
 
-- Total participation ≥ 2 votes
+- Total participation ≥ 1 vote
 - YES fraction ≥ 50%
 - For transmutations: full non-proposer participation, unanimous YES
 
 Mutable rules can make voting *stricter* (e.g. require 75% threshold) but
 never *looser*. A malicious patch can't, for example, redefine
-`compute_quorum` to `return 0` and then pass everything with one vote.
+`compute_quorum` to `return 0` and pass with zero votes.
+
+## What the bot announces
+
+After every tally (whether the poll expired or `/tally` was called early):
+
+- The verdict (`✅ Passed (3✅ 1❌)` or `❌ Failed`)
+- A `patch applied` note when applicable
+- A `points: <@alice> +10 → 35` line for every non-zero award, including
+  the player's new total
+- A separate `🎯 Next turn: <@bob>` message for the next proposer (unless
+  someone just won)
 
 ## Making a patch
 
