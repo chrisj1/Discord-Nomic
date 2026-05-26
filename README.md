@@ -101,6 +101,15 @@ first game.
 `/app/rules` so the engine can read and patch `rules.py` directly. Game
 state (players, proposals, scores) lives in the named volume `nomic-data`.
 
+A second container (`rules-git`) runs `git daemon` on **port 9418** and
+exposes the same `nomic-rules` directory read-only. Players use this to
+`git clone git://<your-nas-host>:9418/nomic-rules` and pull the latest
+rules to diff against. The port needs to be reachable from wherever your
+players are — LAN, VPN, or a router port-forward. If you don't want to
+expose this, set `RULES_PUBLISH_PORT` differently or remove the `ports:`
+mapping in `docker-compose.yml` and players will need to fall back to
+the `/rules` Discord download.
+
 ### Updating
 
 ```sh
@@ -177,18 +186,25 @@ A proposal is a [unified diff](https://en.wikipedia.org/wiki/Diff#Unified_format
 against `rules.py`. The bot only accepts patches that touch `rules.py` — any
 other path in the patch is rejected.
 
-### With git (recommended)
+### With git from the running bot (recommended — always current)
+
+The engine ships a read-only git server on port 9418 that serves the live
+`rules.py` repo. Clone it once, then `git pull` to refresh before each new
+proposal:
 
 ```sh
-git clone <nomic-rules-url> && cd nomic-rules
-$EDITOR rules.py            # make your change
-git diff > my_change.patch  # generate the patch (don't commit)
+git clone git://<your-nas-host>:9418/nomic-rules
+cd nomic-rules
+git pull                     # before each new patch
+$EDITOR rules.py             # make your change
+git diff > my_change.patch   # generate the patch (don't commit)
+git checkout rules.py        # reset for the next patch
 ```
 
-### With plain diff
+### With plain diff (no git access)
 
 ```sh
-# In Discord, run /rules and save the output to rules.py
+# In Discord, run /rules and save the attached file as rules.py
 cp rules.py rules.py.orig
 $EDITOR rules.py
 diff -u rules.py.orig rules.py > my_change.patch
