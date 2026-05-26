@@ -1,6 +1,6 @@
 [submodule "nomic-engine"]
 	path = nomic-engine
-	url = ./nomic-engine
+	url = https://github.com/chrisj1/Discord-Nomic-engine.git
 [submodule "nomic-rules"]
 	path = nomic-rules
-	url = ./nomic-rules
+	url = https://github.com/chrisj1/Discord-Nomic-rules.git
